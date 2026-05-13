@@ -1,0 +1,33 @@
+# ── Stage 1: Dependency download ───────────────────────────────────────────────
+FROM eclipse-temurin:17-jdk-alpine AS deps
+WORKDIR /workspace
+
+COPY pom.xml .
+COPY skyways-common/pom.xml         skyways-common/
+COPY skyways-booking-service/pom.xml skyways-booking-service/
+
+RUN mkdir -p skyways-common/src/main/java \
+             skyways-booking-service/src/main/java
+RUN mvn dependency:go-offline -pl skyways-booking-service -am \
+        --batch-mode --no-transfer-progress -q
+
+# ── Stage 2: Build ──────────────────────────────────────────────────────────────
+FROM deps AS builder
+COPY skyways-common/src          skyways-common/src
+COPY skyways-booking-service/src skyways-booking-service/src
+RUN mvn clean package -pl skyways-booking-service -am -DskipTests \
+        --batch-mode --no-transfer-progress
+
+# ── Stage 3: Runtime ────────────────────────────────────────────────────────────
+FROM eclipse-temurin:17-jre-alpine
+RUN addgroup -S skyways && adduser -S skyways -G skyways
+WORKDIR /app
+RUN mkdir -p /app/logs && chown -R skyways:skyways /app
+COPY --from=builder /workspace/skyways-booking-service/target/*.jar app.jar
+RUN chown skyways:skyways app.jar
+USER skyways
+EXPOSE 8083
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]

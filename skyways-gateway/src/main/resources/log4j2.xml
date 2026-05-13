@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level [%logger{36}] [%X{traceId}] - %msg%n"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <!-- Suppress reactor-netty/gRPC noise -->
+        <Logger name="io.grpc"           level="WARN" additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="io.netty"          level="WARN" additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="reactor.netty"     level="WARN" additivity="false"><AppenderRef ref="Console"/></Logger>
+
+        <!-- Spring framework — warn only; gateway routes are INFO below -->
+        <Logger name="org.springframework"              level="WARN" additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="org.springframework.cloud.gateway" level="INFO" additivity="false"><AppenderRef ref="Console"/></Logger>
+
+        <!-- Eureka client -->
+        <Logger name="com.netflix" level="WARN" additivity="false"><AppenderRef ref="Console"/></Logger>
+
+        <!-- SkyWays gateway code -->
+        <Logger name="com.skyways" level="DEBUG" additivity="false"><AppenderRef ref="Console"/></Logger>
+
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+
+</Configuration>

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyways-booking-service
+  namespace: skyways-core
+  labels:
+    app: skyways-booking-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: skyways-booking-service
+  template:
+    metadata:
+      labels:
+        app: skyways-booking-service
+    spec:
+      containers:
+        - name: skyways-booking-service
+          image: skyways/skyways-booking-service:latest
+          ports:
+            - containerPort: 8083
+            - containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: skyways-config
+            - secretRef:
+                name: skyways-secrets
+          env:
+            - name: DB_NAME
+              value: "booking_db"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+            initialDelaySeconds: 45
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "768Mi"
+            limits:
+              cpu: "1"
+              memory: "1.5Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skyways-booking-service
+  namespace: skyways-core
+spec:
+  selector:
+    app: skyways-booking-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+  type: ClusterIP

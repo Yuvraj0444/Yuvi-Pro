@@ -1,0 +1,28 @@
+{
+  "index_patterns": ["skyways-logs-*"],
+  "settings": {
+    "number_of_shards": 3,
+    "number_of_replicas": 1,
+    "index": {
+      "refresh_interval": "5s",
+      "lifecycle": {
+        "name": "skyways-logs-policy",
+        "rollover_alias": "skyways-logs"
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "@timestamp":   { "type": "date" },
+      "level":        { "type": "keyword" },
+      "service":      { "type": "keyword" },
+      "traceId":      { "type": "keyword" },
+      "userId":       { "type": "keyword" },
+      "bookingId":    { "type": "keyword" },
+      "environment":  { "type": "keyword" },
+      "log_message":  { "type": "text", "analyzer": "standard" },
+      "exception":    { "type": "text" },
+      "tags":         { "type": "keyword" }
+    }
+  }
+}

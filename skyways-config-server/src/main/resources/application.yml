@@ -1,0 +1,32 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: skyways-config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: ${GIT_URI:https://github.com/skyways/skyways-config-repo}
+          username: ${GIT_USERNAME:}
+          password: ${GIT_PASSWORD:}
+          clone-on-start: false
+          default-label: main
+          search-paths: '{application}'
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh,bus-refresh
+
+logging:
+  config: classpath:log4j2.xml

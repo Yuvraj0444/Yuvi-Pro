@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skyways-app-config
+  namespace: skyways-core
+data:
+  # ── Eureka ──────────────────────────────────────────────────────────────────
+  EUREKA_URL: "http://eureka:secret@skyways-registry.skyways-core.svc.cluster.local:8761/eureka/"
+  EUREKA_HOST: "skyways-registry.skyways-core.svc.cluster.local"
+  EUREKA_USER: "eureka"
+
+  # ── Config Server ────────────────────────────────────────────────────────────
+  CONFIG_SERVER_URL: "optional:configserver:http://skyways-config-server.skyways-core.svc.cluster.local:8888"
+  GIT_URI: ""           # Override in Kustomize/Helm per environment
+  GIT_USERNAME: ""
+
+  # ── Kafka ─────────────────────────────────────────────────────────────────────
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.skyways-data.svc.cluster.local:9092"
+
+  # ── Database hosts (per service; each gets its own PostgreSQL) ──────────────
+  USER_DB_HOST: "postgres-user.skyways-data.svc.cluster.local"
+  USER_DB_USER: "skyways_user"
+
+  FLIGHT_DB_HOST: "postgres-flight.skyways-data.svc.cluster.local"
+  FLIGHT_DB_USER: "skyways_flight"
+
+  BOOKING_DB_HOST: "postgres-booking.skyways-data.svc.cluster.local"
+  BOOKING_DB_USER: "skyways_booking"
+
+  PAYMENT_DB_HOST: "postgres-payment.skyways-data.svc.cluster.local"
+  PAYMENT_DB_USER: "skyways_payment"
+
+  SAGA_DB_HOST: "postgres-saga.skyways-data.svc.cluster.local"
+  SAGA_DB_USER: "skyways_saga"
+
+  # ── GCP / external ──────────────────────────────────────────────────────────
+  GCP_PROJECT_ID: "skyways-airlines-prod"
+  GDS_BASE_URL: "https://api.gds-provider.com/v1"
+  SKYSCANNER_BASE_URL: "https://skyscanner-api.p.rapidapi.com"
+  SENDER_EMAIL: "bookings@skyways.com"
+
+  # ── JVM / JConsole (JMX exposed on port 9090 for kubectl port-forward) ──────
+  JVM_JMX_OPTS: >-
+    -Dcom.sun.management.jmxremote=true
+    -Dcom.sun.management.jmxremote.port=9090
+    -Dcom.sun.management.jmxremote.authenticate=false
+    -Dcom.sun.management.jmxremote.ssl=false
+    -Djava.rmi.server.hostname=127.0.0.1
+
+  ENVIRONMENT: "production"

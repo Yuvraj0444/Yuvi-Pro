@@ -1,0 +1,60 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: skyways-booking-service
+  config:
+    import: optional:configserver:http://${CONFIG_SERVER_URI:localhost:8888}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/booking_db
+    username: ${DB_USER:skyways}
+    password: ${DB_PASS:skyways_pass}
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: booking-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.skyways.*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+gcp:
+  project-id: ${GCP_PROJECT_ID:skyways-airlines-prod}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
+logging:
+  config: classpath:log4j2.xml

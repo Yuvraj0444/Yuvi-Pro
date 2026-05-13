@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+
+    <Properties>
+        <Property name="PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level [%logger{36}] - %msg%n</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${PATTERN}" />
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <!-- Suppress Eureka/Netflix chatty internals -->
+        <Logger name="com.netflix"                    level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="com.netflix.eureka"             level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="com.netflix.discovery"          level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="org.springframework.cloud"      level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="org.springframework.web"        level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="org.springframework.security"   level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="org.springframework"            level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="org.eclipse.jetty"              level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+        <Logger name="sun.rmi"                        level="WARN"  additivity="false"><AppenderRef ref="Console"/></Logger>
+
+        <!-- SkyWays registry code at INFO -->
+        <Logger name="com.skyways" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+
+</Configuration>

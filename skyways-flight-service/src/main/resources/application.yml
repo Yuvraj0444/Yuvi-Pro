@@ -1,0 +1,85 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: skyways-flight-service
+  config:
+    import: optional:configserver:http://${CONFIG_SERVER_URI:localhost:8888}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/flight_db
+    username: ${DB_USER:skyways}
+    password: ${DB_PASS:skyways_pass}
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: flight-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.skyways.*"
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      gds-cb:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+      skyscanner-cb:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+  retry:
+    instances:
+      gds-retry:
+        max-attempts: 3
+        wait-duration: 2s
+      skyscanner-retry:
+        max-attempts: 2
+        wait-duration: 1s
+  timelimiter:
+    instances:
+      gds-tl:
+        timeout-duration: 5s
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+gcp:
+  project-id: ${GCP_PROJECT_ID:skyways-airlines-prod}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
+logging:
+  config: classpath:log4j2.xml

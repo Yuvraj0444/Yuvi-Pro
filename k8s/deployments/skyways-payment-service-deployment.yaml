@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyways-payment-service
+  namespace: skyways-core
+  labels:
+    app: skyways-payment-service
+    version: "1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: skyways-payment-service
+  template:
+    metadata:
+      labels:
+        app: skyways-payment-service
+    spec:
+      containers:
+        - name: skyways-payment-service
+          image: skyways/payment-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8084
+            - containerPort: 9090
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "production"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: PAYMENT_DB_HOST
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: PAYMENT_DB_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: skyways-app-secrets
+                  key: PAYMENT_DB_PASS
+            - name: KAFKA_BOOTSTRAP
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: EUREKA_URL
+            - name: SPRING_CONFIG_IMPORT
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: CONFIG_SERVER_URL
+            - name: GCP_PROJECT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: GCP_PROJECT_ID
+            - name: JAVA_TOOL_OPTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: JVM_JMX_OPTS
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8084
+            initialDelaySeconds: 45
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "384Mi"
+            limits:
+              cpu: "1000m"
+              memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skyways-payment-service
+  namespace: skyways-core
+spec:
+  selector:
+    app: skyways-payment-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8084
+    - name: jmx
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP

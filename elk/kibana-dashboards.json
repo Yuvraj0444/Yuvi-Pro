@@ -1,0 +1,95 @@
+{
+  "version": "8.13.0",
+  "objects": [
+    {
+      "type": "dashboard",
+      "id": "skyways-booking-funnel",
+      "attributes": {
+        "title": "SkyWays Booking Funnel",
+        "description": "Tracks bookings from INITIATED → SEAT_RESERVED → PAYMENT_PENDING → CONFIRMED vs CANCELLED",
+        "panels": [
+          {
+            "title": "Bookings Initiated per Hour",
+            "type": "lens",
+            "query": { "match": { "log_message": "Booking created" } }
+          },
+          {
+            "title": "Bookings Confirmed per Hour",
+            "type": "lens",
+            "query": { "match": { "log_message": "Booking status updated.*CONFIRMED" } }
+          },
+          {
+            "title": "Bookings Cancelled per Hour",
+            "type": "lens",
+            "query": { "match": { "log_message": "Booking status updated.*CANCELLED" } }
+          }
+        ]
+      }
+    },
+    {
+      "type": "dashboard",
+      "id": "skyways-payment-errors",
+      "attributes": {
+        "title": "SkyWays Payment Errors",
+        "description": "PaymentFailedException rate, Stripe decline codes, GatewayUnavailable events",
+        "panels": [
+          {
+            "title": "Payment Failures per Hour",
+            "type": "lens",
+            "filter": { "tag": "payment_error" }
+          },
+          {
+            "title": "Card Decline Reasons",
+            "type": "terms",
+            "field": "log_message.keyword"
+          },
+          {
+            "title": "Stripe Gateway Unavailable Events",
+            "type": "lens",
+            "query": { "match": { "log_message": "PaymentGatewayUnavailable" } }
+          }
+        ]
+      }
+    },
+    {
+      "type": "dashboard",
+      "id": "skyways-overbooking",
+      "attributes": {
+        "title": "SkyWays Overbooking Attempts",
+        "description": "FlightOverBookedException frequency per route",
+        "panels": [
+          {
+            "title": "Overbooking Attempts by Route",
+            "type": "terms",
+            "filter": { "tag": "overbooking_attempt" }
+          }
+        ]
+      }
+    },
+    {
+      "type": "dashboard",
+      "id": "skyways-circuit-breakers",
+      "attributes": {
+        "title": "SkyWays Circuit Breaker Status",
+        "description": "GDS and Skyscanner circuit breaker open/closed events over time",
+        "panels": [
+          {
+            "title": "Circuit Breaker Events Timeline",
+            "type": "lens",
+            "filter": { "tag": "circuit_breaker_event" }
+          },
+          {
+            "title": "GDS Fallback Rate",
+            "type": "lens",
+            "query": { "match": { "log_message": "GDS circuit breaker fallback" } }
+          },
+          {
+            "title": "Skyscanner Fallback Rate",
+            "type": "lens",
+            "query": { "match": { "log_message": "Skyscanner circuit breaker fallback" } }
+          }
+        ]
+      }
+    }
+  ]
+}

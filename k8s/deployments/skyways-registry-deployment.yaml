@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyways-registry
+  namespace: skyways-core
+  labels:
+    app: skyways-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skyways-registry
+  template:
+    metadata:
+      labels:
+        app: skyways-registry
+    spec:
+      containers:
+        - name: skyways-registry
+          image: skyways/skyways-registry:latest
+          ports:
+            - containerPort: 8761
+            - containerPort: 9090   # JMX for JConsole
+          envFrom:
+            - configMapRef:
+                name: skyways-config
+            - secretRef:
+                name: skyways-secrets
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8761
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8761
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skyways-registry
+  namespace: skyways-core
+spec:
+  selector:
+    app: skyways-registry
+  ports:
+    - name: http
+      port: 8761
+      targetPort: 8761
+  type: ClusterIP

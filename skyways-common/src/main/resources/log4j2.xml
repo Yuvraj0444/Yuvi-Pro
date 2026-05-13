@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+
+    <Properties>
+        <Property name="LOG_DIR">logs</Property>
+        <Property name="APP_NAME">skyways</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level [%logger{36}] [%X{traceId}] - %msg%n</Property>
+    </Properties>
+
+    <Appenders>
+
+        <!-- Console — JSON for structured ingestion by Logstash/Filebeat -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <JsonTemplateLayout>
+                <EventTemplateAdditionalField key="service"
+                    value="${sys:spring.application.name:-skyways}" />
+                <EventTemplateAdditionalField key="environment"
+                    value="${sys:ENVIRONMENT:-local}" />
+                <EventTemplateAdditionalField key="traceId"
+                    value="$${ctx:traceId}" />
+            </JsonTemplateLayout>
+        </Console>
+
+        <!-- Daily rolling file — kept 30 days -->
+        <RollingFile name="RollingFile"
+                     fileName="${LOG_DIR}/${APP_NAME}.log"
+                     filePattern="${LOG_DIR}/${APP_NAME}-%d{yyyy-MM-dd}-%i.log.gz">
+            <JsonTemplateLayout>
+                <EventTemplateAdditionalField key="service"
+                    value="${sys:spring.application.name:-skyways}" />
+                <EventTemplateAdditionalField key="traceId"
+                    value="$${ctx:traceId}" />
+                <EventTemplateAdditionalField key="userId"
+                    value="$${ctx:userId}" />
+                <EventTemplateAdditionalField key="bookingId"
+                    value="$${ctx:bookingId}" />
+            </JsonTemplateLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="100 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="30" />
+        </RollingFile>
+
+        <!-- Logstash TCP — active only when LOGSTASH_HOST env var is set.
+             Log4j2 retries the connection automatically; missing host is silent. -->
+        <Socket name="Logstash"
+                host="${env:LOGSTASH_HOST:-localhost}"
+                port="${env:LOGSTASH_PORT:-5000}"
+                protocol="TCP"
+                reconnectionDelayMillis="5000"
+                connectTimeoutMillis="3000"
+                ignoreExceptions="true">
+            <JsonTemplateLayout>
+                <EventTemplateAdditionalField key="service"
+                    value="${sys:spring.application.name:-skyways}" />
+                <EventTemplateAdditionalField key="environment"
+                    value="${env:ENVIRONMENT:-local}" />
+                <EventTemplateAdditionalField key="traceId"
+                    value="$${ctx:traceId}" />
+                <EventTemplateAdditionalField key="userId"
+                    value="$${ctx:userId}" />
+                <EventTemplateAdditionalField key="bookingId"
+                    value="$${ctx:bookingId}" />
+            </JsonTemplateLayout>
+        </Socket>
+
+        <!-- Async wrapper — non-blocking I/O for all appenders -->
+        <Async name="AsyncAppender" includeLocation="true">
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="RollingFile" />
+            <AppenderRef ref="Logstash" />
+        </Async>
+
+    </Appenders>
+
+    <Loggers>
+
+        <!-- ── SkyWays application code ──────────────────────────────── -->
+        <Logger name="com.skyways" level="DEBUG" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Spring Framework — suppress all startup noise ─────────── -->
+        <Logger name="org.springframework" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <!-- BeanPostProcessorChecker: "bean X not eligible for all BPPs" -->
+        <Logger name="org.springframework.context.support" level="ERROR" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Spring Cloud ───────────────────────────────────────────── -->
+        <Logger name="org.springframework.cloud" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <!-- Config Client: repeated "label not found", "Using default label" -->
+        <Logger name="org.springframework.cloud.config.client" level="ERROR" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <!-- LoadBalancer BeanPostProcessor registration noise -->
+        <Logger name="org.springframework.cloud.loadbalancer" level="ERROR" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Eureka / Netflix ───────────────────────────────────────── -->
+        <Logger name="com.netflix" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <Logger name="com.netflix.discovery" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Hibernate ─────────────────────────────────────────────── -->
+        <Logger name="org.hibernate" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <!-- HHH90000025: dialect does not need to be specified explicitly -->
+        <Logger name="org.hibernate.orm.deprecation" level="ERROR" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Kafka ─────────────────────────────────────────────────── -->
+        <Logger name="org.apache.kafka" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Netty / Reactor ───────────────────────────────────────── -->
+        <Logger name="io.netty" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <Logger name="reactor.netty" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── GCP / gRPC (present in services with secretmanager) ───── -->
+        <Logger name="io.grpc" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+        <Logger name="com.google" level="WARN" additivity="false">
+            <AppenderRef ref="AsyncAppender" />
+        </Logger>
+
+        <!-- ── Root ──────────────────────────────────────────────────── -->
+        <Root level="INFO">
+            <AppenderRef ref="AsyncAppender" />
+        </Root>
+
+    </Loggers>
+
+</Configuration>

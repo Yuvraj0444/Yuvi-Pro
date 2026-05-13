@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyways-config-server
+  namespace: skyways-core
+  labels:
+    app: skyways-config-server
+    version: "1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skyways-config-server
+  template:
+    metadata:
+      labels:
+        app: skyways-config-server
+    spec:
+      containers:
+        - name: skyways-config-server
+          image: skyways/config-server:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8888
+            - containerPort: 9090
+          env:
+            - name: GIT_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: GIT_URI
+            - name: GIT_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: GIT_USERNAME
+            - name: GIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: skyways-app-secrets
+                  key: GIT_PASSWORD
+            - name: SPRING_PROFILES_ACTIVE
+              value: "production"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: skyways-app-config
+                  key: EUREKA_URL
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skyways-config-server
+  namespace: skyways-core
+spec:
+  selector:
+    app: skyways-config-server
+  ports:
+    - name: http
+      port: 8888
+      targetPort: 8888
+    - name: jmx
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP

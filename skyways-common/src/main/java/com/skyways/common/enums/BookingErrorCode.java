@@ -1,0 +1,10 @@
+package com.skyways.common.enums;
+
+public enum BookingErrorCode {
+    BOOKING_NOT_FOUND,
+    BOOKING_ALREADY_CANCELLED,
+    INVALID_PASSENGER_DETAILS,
+    PASSPORT_EXPIRED,
+    INVALID_CONTACT_INFO,
+    SAGA_COMPENSATION_FAILED
+}

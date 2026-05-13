@@ -1,0 +1,538 @@
+# ============================================================
+# SkyWays Airlines — Docker Compose
+# ============================================================
+# Usage:
+#   cp .env.docker .env          # fill in real secrets first
+#   docker compose up -d
+#   docker compose logs -f api-gateway
+#   docker compose down -v       # removes volumes too
+#
+# Build context for all Spring Boot services is the project root.
+# Each service's Dockerfile lives in docker/Dockerfile.<name>.
+# ============================================================
+
+x-spring-common: &spring-common
+  restart: unless-stopped
+  networks:
+    - skyways-network
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+x-app-env: &app-env
+  EUREKA_HOST: eureka-registry
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-registry:8761/eureka/
+  CONFIG_SERVER_URI: config-server:8888
+  SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+  KAFKA_BOOTSTRAP: kafka:9092
+  DB_HOST: postgres
+  DB_USER: ${DB_USER:-skyways}
+  DB_PASS: ${DB_PASS:-skyways_pass}
+  LOGSTASH_HOST: logstash
+  LOGSTASH_PORT: "5000"
+  ENVIRONMENT: docker
+
+services:
+
+  # ════════════════════════════════════════════════════════════
+  # INFRASTRUCTURE — PostgreSQL
+  # ════════════════════════════════════════════════════════════
+  postgres:
+    image: postgres:16-alpine
+    container_name: skyways-postgres
+    restart: unless-stopped
+    networks:
+      - skyways-network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-skyways_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skyways_admin_pass}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skyways_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ════════════════════════════════════════════════════════════
+  # INFRASTRUCTURE — Kafka (with Zookeeper)
+  # ════════════════════════════════════════════════════════════
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: skyways-zookeeper
+    restart: unless-stopped
+    networks:
+      - skyways-network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: skyways-kafka
+    restart: unless-stopped
+    networks:
+      - skyways-network
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    ports:
+      - "29092:29092"   # host-accessible listener for local tools
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: skyways-kafka-init
+    networks:
+      - skyways-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./kafka/create-topics.sh:/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/create-topics.sh"]
+    restart: on-failure
+
+  # ════════════════════════════════════════════════════════════
+  # INFRASTRUCTURE — ELK Stack (Elasticsearch 8.x)
+  # ════════════════════════════════════════════════════════════
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: skyways-elasticsearch
+    restart: unless-stopped
+    networks:
+      - skyways-network
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./elk/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.0
+    container_name: skyways-logstash
+    restart: unless-stopped
+    networks:
+      - skyways-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+      - ENVIRONMENT=${ENVIRONMENT:-docker}
+    volumes:
+      - ./elk/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./elk/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    ports:
+      - "5044:5044"   # Beats input
+      - "5000:5000"   # TCP input (Log4j2 SocketAppender)
+      - "9600:9600"   # Logstash monitoring API
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9600/_node/stats || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: skyways-kibana
+    restart: unless-stopped
+    networks:
+      - skyways-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_NAME: skyways-kibana
+      XPACK_SECURITY_ENABLED: "false"
+    volumes:
+      - kibana-data:/usr/share/kibana/data
+    ports:
+      - "5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:5601/api/status || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ════════════════════════════════════════════════════════════
+  # SPRING CLOUD — Eureka Registry
+  # ════════════════════════════════════════════════════════════
+  eureka-registry:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.registry
+    container_name: skyways-eureka-registry
+    environment:
+      SERVER_PORT: "8761"
+      SPRING_APPLICATION_NAME: skyways-registry
+      EUREKA_INSTANCE_HOSTNAME: eureka-registry
+      EUREKA_USER: ${EUREKA_USER:-eureka}
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-secret}
+      ENVIRONMENT: docker
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: "5000"
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ════════════════════════════════════════════════════════════
+  # SPRING CLOUD — Config Server
+  # ════════════════════════════════════════════════════════════
+  config-server:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.config-server
+    container_name: skyways-config-server
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: "8888"
+      SPRING_APPLICATION_NAME: skyways-config-server
+      EUREKA_HOST: eureka-registry
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-registry:8761/eureka/
+      GIT_URI: ${GIT_URI:-https://github.com/skyways/skyways-config-repo}
+      GIT_USERNAME: ${GIT_USERNAME:-}
+      GIT_PASSWORD: ${GIT_PASSWORD:-}
+      ENVIRONMENT: docker
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: "5000"
+    ports:
+      - "8888:8888"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ════════════════════════════════════════════════════════════
+  # SPRING CLOUD — API Gateway
+  # ════════════════════════════════════════════════════════════
+  api-gateway:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gateway
+    container_name: skyways-api-gateway
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8080"
+      SPRING_APPLICATION_NAME: skyways-gateway
+      JWT_SECRET: ${JWT_SECRET:-changeme}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ════════════════════════════════════════════════════════════
+  # MICROSERVICES
+  # ════════════════════════════════════════════════════════════
+  user-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.user-service
+    container_name: skyways-user-service
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8081"
+      SPRING_APPLICATION_NAME: skyways-user-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
+      SPRING_DATASOURCE_USERNAME: skyways_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-skyways_pass}
+      JWT_SECRET: ${JWT_SECRET:-changeme}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-skyways-airlines-prod}
+      TRIPLE_DES_KEY: ${TRIPLE_DES_KEY:-skyways-3des-24byte-key!!}
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  flight-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.flight-service
+    container_name: skyways-flight-service
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8082"
+      SPRING_APPLICATION_NAME: skyways-flight-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flight_db
+      SPRING_DATASOURCE_USERNAME: skyways_flight
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-skyways_pass}
+      GDS_API_KEY: ${GDS_API_KEY:-changeme}
+      SKYSCANNER_API_KEY: ${SKYSCANNER_API_KEY:-changeme}
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  booking-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.booking-service
+    container_name: skyways-booking-service
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8083"
+      SPRING_APPLICATION_NAME: skyways-booking-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/booking_db
+      SPRING_DATASOURCE_USERNAME: skyways_booking
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-skyways_pass}
+      TRIPLE_DES_KEY: ${TRIPLE_DES_KEY:-skyways-3des-24byte-key!!}
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  payment-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.payment-service
+    container_name: skyways-payment-service
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8084"
+      SPRING_APPLICATION_NAME: skyways-payment-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: skyways_payment
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-skyways_pass}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_changeme}
+    ports:
+      - "8084:8084"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  notification-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.notification-service
+    container_name: skyways-notification-service
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8085"
+      SPRING_APPLICATION_NAME: skyways-notification-service
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-SG.changeme}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-skyways-airlines-prod}
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  saga-orchestrator:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.saga-orchestrator
+    container_name: skyways-saga-orchestrator
+    depends_on:
+      eureka-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      SERVER_PORT: "8086"
+      SPRING_APPLICATION_NAME: skyways-saga-orchestrator
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/saga_db
+      SPRING_DATASOURCE_USERNAME: skyways_saga
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-skyways_pass}
+    ports:
+      - "8086:8086"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+# ════════════════════════════════════════════════════════════
+# VOLUMES
+# ════════════════════════════════════════════════════════════
+volumes:
+  postgres-data:
+  zookeeper-data:
+  zookeeper-log:
+  kafka-data:
+  elasticsearch-data:
+  kibana-data:
+
+# ════════════════════════════════════════════════════════════
+# NETWORKS
+# ════════════════════════════════════════════════════════════
+networks:
+  skyways-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

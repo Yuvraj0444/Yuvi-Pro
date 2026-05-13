@@ -1,0 +1,21 @@
+# Secrets — never commit
+secrets.env
+*.env
+!scripts/.env.example
+
+# Maven
+target/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db

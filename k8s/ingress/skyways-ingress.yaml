@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: skyways-ingress
+  namespace: skyways-core
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.skyways.com
+      secretName: skyways-tls-secret
+  rules:
+    - host: api.skyways.com
+      http:
+        paths:
+          - path: /api/v1/(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: skyways-gateway
+                port:
+                  number: 80
+          - path: /actuator/health
+            pathType: Exact
+            backend:
+              service:
+                name: skyways-gateway
+                port:
+                  number: 80

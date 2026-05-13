@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyways-gateway
+  namespace: skyways-core
+  labels:
+    app: skyways-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: skyways-gateway
+  template:
+    metadata:
+      labels:
+        app: skyways-gateway
+    spec:
+      containers:
+        - name: skyways-gateway
+          image: skyways/skyways-gateway:latest
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: skyways-config
+            - secretRef:
+                name: skyways-secrets
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "768Mi"
+            limits:
+              cpu: "1"
+              memory: "1.5Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skyways-gateway
+  namespace: skyways-core
+spec:
+  selector:
+    app: skyways-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer

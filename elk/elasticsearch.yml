@@ -1,0 +1,16 @@
+cluster.name: skyways-cluster
+node.name: skyways-es-node-1
+
+# Single-node for docker-compose; remove for multi-node Kubernetes StatefulSet
+discovery.type: single-node
+
+# Disable X-Pack security for the development environment.
+# Set xpack.security.enabled: true and configure TLS for production.
+xpack.security.enabled: false
+xpack.monitoring.collection.enabled: true
+
+bootstrap.memory_lock: true
+
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300

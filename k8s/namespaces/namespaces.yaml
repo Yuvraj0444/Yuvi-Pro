@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skyways-core
+  labels:
+    app.kubernetes.io/part-of: skyways-airlines
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skyways-data
+  labels:
+    app.kubernetes.io/part-of: skyways-airlines
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skyways-monitoring
+  labels:
+    app.kubernetes.io/part-of: skyways-airlines
