@@ -20,7 +20,7 @@ public class FareClass {
     private UUID fareId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "flight_id", nullable = false)
+    @JoinColumn(name = "flight_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Flight flight;
 
     @Column(name = "class_type", nullable = false, length = 20)

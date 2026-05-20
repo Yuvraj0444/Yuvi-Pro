@@ -4,6 +4,7 @@ import com.skyways.common.exception.auth.AuthenticationException;
 import com.skyways.user.dto.LoginRequest;
 import com.skyways.user.dto.LoginResponse;
 import com.skyways.user.dto.RegisterRequest;
+import com.skyways.user.dto.UserProfileDto;
 import com.skyways.user.entity.AuditLog;
 import com.skyways.user.entity.User;
 import com.skyways.user.kafka.UserEventProducer;
@@ -15,6 +16,8 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 @Service
 public class UserService {
@@ -68,7 +71,38 @@ public class UserService {
         }
     }
 
-    @Transactional(readOnly = true)
+    public UserProfileDto getProfile(UUID userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AuthenticationException("User not found"));
+        return toProfileDto(user);
+    }
+
+    @Transactional
+    public UserProfileDto updateProfile(UUID userId, UserProfileDto dto) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AuthenticationException("User not found"));
+        if (dto.getFullName() != null && !dto.getFullName().isBlank()) {
+            user.setFullName(dto.getFullName());
+        }
+        if (dto.getPhone() != null) {
+            user.setPhone(dto.getPhone());
+        }
+        user = userRepository.save(user);
+        log.info("Profile updated [userId={}]", userId);
+        return toProfileDto(user);
+    }
+
+    private UserProfileDto toProfileDto(User user) {
+        return UserProfileDto.builder()
+            .userId(user.getUserId().toString())
+            .fullName(user.getFullName())
+            .email(user.getEmail())
+            .phone(user.getPhone())
+            .role(user.getRole().name())
+            .build();
+    }
+
+    @Transactional
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         try {
             User user = userRepository.findByEmail(request.getEmail())

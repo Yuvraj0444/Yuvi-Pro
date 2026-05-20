@@ -17,7 +17,7 @@ spring:
       ddl-auto: none
     open-in-view: false
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:29092}
     consumer:
       group-id: booking-service-group
       auto-offset-reset: earliest
@@ -31,6 +31,7 @@ spring:
       acks: all
       properties:
         enable.idempotence: true
+        max.block.ms: 5000
 
 eureka:
   client:

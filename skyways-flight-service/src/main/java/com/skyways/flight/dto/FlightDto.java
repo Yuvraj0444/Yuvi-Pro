@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -27,5 +28,12 @@ public class FlightDto {
     private BigDecimal basePrice;
     private String currency;
     private String cabinClass;
-    private String source;  // GDS | SKYSCANNER | INTERNAL
+    private String source;  // GDS | SKYSCANNER | INTERNAL | CONNECTING
+
+    // Populated only for connecting flights (stops > 0)
+    private int stops;
+    private String connectionVia;       // hub airport IATA e.g. "DEL"
+    private String connectionCity;      // hub city name
+    private Integer layoverMinutes;
+    private List<FlightDto> legs;       // the individual flight legs
 }

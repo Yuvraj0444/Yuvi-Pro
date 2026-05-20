@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    @apply font-sans antialiased text-gray-900 bg-white;
+  }
+
+  h1, h2, h3, h4 { @apply font-bold tracking-tight; }
+}
+
+@layer components {
+
+  /* ── Hero background ──────────────────────────────── */
+  .bg-hero-pattern {
+    background: linear-gradient(135deg, #0a1550 0%, #0f2382 40%, #0d38e9 70%, #1e56f3 100%);
+  }
+
+  /* ── Buttons ──────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl bg-blue-600 px-6 py-3
+           text-sm font-semibold text-white
+           shadow-md shadow-blue-500/30
+           hover:bg-blue-700 active:scale-95
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-150 cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl border border-gray-300 bg-white px-6 py-3
+           text-sm font-semibold text-gray-700
+           hover:bg-gray-50 active:scale-95
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-150 cursor-pointer;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-xl bg-red-600 px-6 py-3
+           text-sm font-semibold text-white
+           hover:bg-red-700 active:scale-95
+           transition-all duration-150 cursor-pointer;
+  }
+
+  /* ── Form elements ────────────────────────────────── */
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1.5;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-gray-300 bg-white
+           px-4 py-3 text-sm text-gray-900
+           placeholder:text-gray-400
+           shadow-sm
+           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           disabled:bg-gray-50 disabled:text-gray-500
+           transition-shadow duration-150;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:ring-red-400;
+  }
+
+  .error-text {
+    @apply mt-1 text-xs text-red-500 font-medium;
+  }
+
+  /* ── Cards ────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl border border-gray-200
+           shadow-xl shadow-gray-200/60 p-6 sm:p-8;
+  }
+
+  .card-sm {
+    @apply bg-white rounded-xl border border-gray-200
+           shadow-md shadow-gray-100/80 p-4;
+  }
+
+  /* ── Typography ───────────────────────────────────── */
+  .page-title {
+    @apply text-2xl font-bold text-gray-900;
+  }
+
+  .section-title {
+    @apply text-xl font-bold text-gray-900;
+  }
+
+  /* ── Badge ────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .badge-blue   { @apply badge bg-blue-100 text-blue-700; }
+  .badge-green  { @apply badge bg-green-100 text-green-700; }
+  .badge-yellow { @apply badge bg-yellow-100 text-yellow-700; }
+  .badge-red    { @apply badge bg-red-100 text-red-700; }
+  .badge-gray   { @apply badge bg-gray-100 text-gray-600; }
+
+  /* ── Divider ──────────────────────────────────────── */
+  .divider {
+    @apply my-4 h-px bg-gray-100;
+  }
+}

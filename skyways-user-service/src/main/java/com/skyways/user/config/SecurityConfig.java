@@ -30,6 +30,7 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(new AntPathRequestMatcher("/api/v1/auth/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/api/v1/users/**")).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/actuator/**")).permitAll()
                 .anyRequest().authenticated()
             )

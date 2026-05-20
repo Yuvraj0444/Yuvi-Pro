@@ -28,7 +28,7 @@ public class Flight {
     @JoinColumn(name = "airline_id")
     private Airline airline;
 
-    @Column(name = "flight_number", nullable = false, length = 10)
+    @Column(name = "flight_number", nullable = false, length = 20)
     private String flightNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)

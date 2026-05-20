@@ -41,17 +41,23 @@ public class BookingEventProducer {
                 ))
                 .build();
 
-        kafkaTemplate.send(KafkaTopics.BOOKING_INITIATED,
-                booking.getBookingId().toString(), envelope)
-            .whenComplete((r, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish BOOKING_INITIATED [bookingId={}]: {}",
-                        booking.getBookingId(), ex.getMessage());
-                } else {
-                    log.info("Published BOOKING_INITIATED [bookingId={}, offset={}]",
-                        booking.getBookingId(), r.getRecordMetadata().offset());
-                }
-            });
+        try {
+            kafkaTemplate.send(KafkaTopics.BOOKING_INITIATED,
+                    booking.getBookingId().toString(), envelope)
+                .whenComplete((r, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish BOOKING_INITIATED [bookingId={}]: {}",
+                            booking.getBookingId(), ex.getMessage());
+                    } else {
+                        log.info("Published BOOKING_INITIATED [bookingId={}, offset={}]",
+                            booking.getBookingId(), r.getRecordMetadata().offset());
+                    }
+                });
+        } catch (Exception e) {
+            // Kafka unavailable — booking is persisted; saga will be triggered when Kafka recovers
+            log.error("Kafka send threw synchronously for BOOKING_INITIATED [bookingId={}]: {}",
+                booking.getBookingId(), e.getMessage());
+        }
     }
 
     public void publishBookingConfirmed(String bookingId, String sagaId) {
@@ -75,13 +81,17 @@ public class BookingEventProducer {
                 .payload(payload)
                 .build();
 
-        kafkaTemplate.send(topic, key, envelope)
-            .whenComplete((r, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish {} [key={}]: {}", eventType, key, ex.getMessage());
-                } else {
-                    log.info("Published {} [key={}]", eventType, key);
-                }
-            });
+        try {
+            kafkaTemplate.send(topic, key, envelope)
+                .whenComplete((r, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish {} [key={}]: {}", eventType, key, ex.getMessage());
+                    } else {
+                        log.info("Published {} [key={}]", eventType, key);
+                    }
+                });
+        } catch (Exception e) {
+            log.error("Kafka send threw synchronously for {} [key={}]: {}", eventType, key, e.getMessage());
+        }
     }
 }

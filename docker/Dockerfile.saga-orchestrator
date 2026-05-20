@@ -1,25 +1,36 @@
-# ── Stage 1: Dependency download ───────────────────────────────────────────────
-FROM eclipse-temurin:17-jdk-alpine AS deps
+FROM --platform=linux/amd64 maven:3.9-eclipse-temurin-17-alpine AS deps
 WORKDIR /workspace
 
 COPY pom.xml .
-COPY skyways-common/pom.xml            skyways-common/
-COPY skyways-saga-orchestrator/pom.xml skyways-saga-orchestrator/
+COPY skyways-common/pom.xml               skyways-common/
+COPY skyways-registry/pom.xml             skyways-registry/
+COPY skyways-config-server/pom.xml        skyways-config-server/
+COPY skyways-gateway/pom.xml              skyways-gateway/
+COPY skyways-user-service/pom.xml         skyways-user-service/
+COPY skyways-flight-service/pom.xml       skyways-flight-service/
+COPY skyways-booking-service/pom.xml      skyways-booking-service/
+COPY skyways-payment-service/pom.xml      skyways-payment-service/
+COPY skyways-notification-service/pom.xml skyways-notification-service/
+COPY skyways-saga-orchestrator/pom.xml    skyways-saga-orchestrator/
 
 RUN mkdir -p skyways-common/src/main/java \
+             skyways-registry/src/main/java \
+             skyways-config-server/src/main/java \
+             skyways-gateway/src/main/java \
+             skyways-user-service/src/main/java \
+             skyways-flight-service/src/main/java \
+             skyways-booking-service/src/main/java \
+             skyways-payment-service/src/main/java \
+             skyways-notification-service/src/main/java \
              skyways-saga-orchestrator/src/main/java
-RUN mvn dependency:go-offline -pl skyways-saga-orchestrator -am \
-        --batch-mode --no-transfer-progress -q
+RUN mvn dependency:go-offline -pl skyways-saga-orchestrator -am --batch-mode --no-transfer-progress -q
 
-# ── Stage 2: Build ──────────────────────────────────────────────────────────────
 FROM deps AS builder
-COPY skyways-common/src             skyways-common/src
-COPY skyways-saga-orchestrator/src  skyways-saga-orchestrator/src
-RUN mvn clean package -pl skyways-saga-orchestrator -am -DskipTests \
-        --batch-mode --no-transfer-progress
+COPY skyways-common/src skyways-common/src
+COPY skyways-saga-orchestrator/src             skyways-saga-orchestrator/src
+RUN mvn clean package -pl skyways-saga-orchestrator -am -DskipTests --batch-mode --no-transfer-progress
 
-# ── Stage 3: Runtime ────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine
+FROM --platform=linux/amd64 eclipse-temurin:17-jre-alpine
 RUN addgroup -S skyways && adduser -S skyways -G skyways
 WORKDIR /app
 RUN mkdir -p /app/logs && chown -R skyways:skyways /app
@@ -27,7 +38,4 @@ COPY --from=builder /workspace/skyways-saga-orchestrator/target/*.jar app.jar
 RUN chown skyways:skyways app.jar
 USER skyways
 EXPOSE 8086
-ENTRYPOINT ["java", \
-  "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
-  "-Djava.security.egd=file:/dev/./urandom", \
-  "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]

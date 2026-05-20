@@ -25,7 +25,7 @@ spring:
         jdbc:
           batch_size: 50
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:29092}
 
 eureka:
   client:

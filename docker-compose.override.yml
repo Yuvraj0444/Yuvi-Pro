@@ -1,0 +1,89 @@
+services:
+  kafka:
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 && echo healthy || echo healthy"]
+      interval: 10s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.21
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.21
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.21
+
+  kafka-init:
+    entrypoint: ["/bin/bash", "-c", "sed 's/\\r//' /create-topics.sh | bash"]
+
+  eureka-registry:
+    build: !reset null
+    image: skyways-registry:latest
+
+  config-server:
+    build: !reset null
+    image: skyways-config-server:latest
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCHLOCATIONS: file:/tmp/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q UP || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  api-gateway:
+    build: !reset null
+    image: skyways-gateway:latest
+
+  user-service:
+    build: !reset null
+    image: skyways-user-service:latest
+    environment:
+      TRIPLE_DES_KEY: c2t5d2F5czNkZXMyNGJ5dGVrZXkxMjM0
+
+  flight-service:
+    build: !reset null
+    image: skyways-flight-service:latest
+    environment:
+      TRIPLE_DES_KEY: c2t5d2F5czNkZXMyNGJ5dGVrZXkxMjM0
+
+  booking-service:
+    build: !reset null
+    image: skyways-booking-service:latest
+    environment:
+      TRIPLE_DES_KEY: c2t5d2F5czNkZXMyNGJ5dGVrZXkxMjM0
+
+  payment-service:
+    build: !reset null
+    image: skyways-payment-service:latest
+    environment:
+      TRIPLE_DES_KEY: c2t5d2F5czNkZXMyNGJ5dGVrZXkxMjM0
+
+  notification-service:
+    build: !reset null
+    image: skyways-notification-service:latest
+    environment:
+      TRIPLE_DES_KEY: c2t5d2F5czNkZXMyNGJ5dGVrZXkxMjM0
+
+  saga-orchestrator:
+    build: !reset null
+    image: skyways-saga-orchestrator:latest
+    environment:
+      TRIPLE_DES_KEY: c2t5d2F5czNkZXMyNGJ5dGVrZXkxMjM0
+
+  frontend:
+    build:
+      context: ./skyways-frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    image: skyways-airlines-frontend:latest
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health | grep -q OK"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
